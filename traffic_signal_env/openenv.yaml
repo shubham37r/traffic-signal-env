@@ -1,0 +1,54 @@
+spec_version: 1
+name: traffic_signal_env
+display_name: Smart Traffic Signal Controller
+description: >
+  A reinforcement learning environment where an agent controls
+  green light durations at a 4-way intersection to minimize
+  total car waiting time. Supports 3 difficulty tasks.
+type: space
+runtime: fastapi
+app: server.app:app
+port: 7860
+
+author: shubham37r
+license: MIT
+
+tasks:
+  - id: easy
+    name: Easy - Keep Traffic Flowing
+    description: Keep total waiting cars below 20 for 10 steps.
+    max_steps: 10
+
+  - id: medium
+    name: Medium - Minimize Wait Time
+    description: Minimize total wait time across 30 steps.
+    max_steps: 30
+
+  - id: hard
+    name: Hard - Handle Traffic Spikes
+    description: Keep average cars per road under 5 despite random spikes for 50 steps.
+    max_steps: 50
+
+action_space:
+  type: object
+  properties:
+    green_durations:
+      type: array
+      items:
+        type: integer
+      description: Green light duration in seconds for each road [north, south, east, west]
+
+observation_space:
+  type: object
+  properties:
+    cars_waiting:
+      type: array
+      items:
+        type: integer
+      description: Number of cars waiting on each road
+    current_phase:
+      type: integer
+      description: Current active signal phase
+    total_wait_time:
+      type: number
+      description: Total accumulated wait time
