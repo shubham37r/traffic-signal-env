@@ -22,7 +22,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 
 # OpenAI client configured via environment variables
-client = OpenAI()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "dummy-key"))
 
 
 def get_action(cars_waiting):
