@@ -35,20 +35,31 @@ def get_action(cars_waiting):
     return durations
 
 
+def parse_obs(data):
+    """Safely extract observation from response dict."""
+    if "observation" in data:
+        return data["observation"]
+    elif "obs" in data:
+        return data["obs"]
+    else:
+        raise KeyError(f"No observation key found in response: {list(data.keys())}")
+
+
 def run_task(task_name):
     """Run one full episode for the given task."""
     max_steps = {"easy": 10, "medium": 30, "hard": 50}
     step_limit = max_steps[task_name]
 
-    # START log
-    print(f"START task={task_name} max_steps={step_limit}")
+    # START log — strictly required format
+    print(f"[START] task={task_name} max_steps={step_limit}")
 
     response = requests.post(f"{API_BASE_URL}/reset", json={
         "episode_id": f"inference-{task_name}",
         "seed": 42,
         "task": task_name
     })
-    obs = response.json()["observation"]
+    response.raise_for_status()
+    obs = parse_obs(response.json())
 
     total_reward = 0.0
 
@@ -59,20 +70,21 @@ def run_task(task_name):
             "action": {"green_durations": durations},
             "timeout_s": 30
         })
+        response.raise_for_status()
         result = response.json()
-        obs = result["observation"]
+        obs = parse_obs(result)
         reward = result["reward"]
         done = result["done"]
         total_reward += reward
 
-        # STEP log (structured format)
-        print(f"STEP step={step} cars={obs['cars_waiting']} reward={reward:.2f} total_wait={obs['total_wait_time']:.0f}")
+        # STEP log — strictly required format
+        print(f"[STEP] step={step} cars={obs['cars_waiting']} reward={reward:.2f} total_wait={obs['total_wait_time']:.0f}")
 
         if done:
             break
 
-    # END log
-    print(f"END task={task_name} total_reward={total_reward:.2f} final_wait={obs['total_wait_time']:.0f}")
+    # END log — strictly required format
+    print(f"[END] task={task_name} total_reward={total_reward:.2f} final_wait={obs['total_wait_time']:.0f}")
 
 
 if __name__ == "__main__":
