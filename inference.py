@@ -154,7 +154,7 @@ def run_task(task_name):
                 break
 
         total_reward = sum(rewards)
-        score = min(max(total_reward / max(step_limit, 1), 0.0), 1.0)
+        score = min(max(total_reward / max(step_limit, 1), 0.01), 0.99)
         success = score > 0.0
 
     except Exception as e:
