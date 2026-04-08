@@ -9,21 +9,26 @@ The agent reads cars_waiting and gives more green time
 to roads with more cars — a greedy heuristic strategy.
 """
 
+import json
 import os
 import requests
 from typing import List, Optional
 from openai import OpenAI
 
 # Environment variables (required by OpenEnv spec)
-API_BASE_URL = os.getenv("API_BASE_URL", "https://shubham37r-traffic-signal-env.hf.space")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 HF_TOKEN = os.getenv("HF_TOKEN")
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 
-# OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "dummy-key"))
-
 BENCHMARK = "traffic_signal_env"
+ENV_URL = "https://shubham37r-traffic-signal-env.hf.space"  # your HF space, always fixed
+
+# OpenAI client — uses validator's injected LLM proxy URL and API key
+client = OpenAI(
+    base_url=API_BASE_URL,
+    api_key=os.getenv("API_KEY") or os.getenv("HF_TOKEN") or "dummy-key"
+)
 
 
 def log_start(task: str, env: str, model: str) -> None:
@@ -41,14 +46,55 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
     print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
 
 
-def get_action(cars_waiting):
-    """Rule-based agent: give more green time to roads with more cars."""
+def get_action_fallback(cars_waiting):
+    """Rule-based fallback: give more green time to roads with more cars."""
     total_cars = sum(cars_waiting)
     if total_cars == 0:
         return [30, 30, 30, 30]
     durations = [int((cars / total_cars) * 120) for cars in cars_waiting]
     durations = [max(10, d) for d in durations]
     return durations
+
+
+def get_action_from_llm(obs):
+    """Use LLM to decide green durations based on current traffic state."""
+    try:
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a traffic signal controller. "
+                        "Given the number of cars waiting at 4 roads and the current phase, "
+                        "return green light durations as a JSON array of exactly 4 integers, "
+                        "each between 10 and 60 seconds. "
+                        "Give more time to roads with more cars. "
+                        "Return ONLY the JSON array, nothing else. Example: [30, 20, 40, 10]"
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Cars waiting at each road: {obs['cars_waiting']}. "
+                        f"Current phase: {obs['current_phase']}. "
+                        f"Total wait time so far: {obs['total_wait_time']}. "
+                        "Return green durations as a JSON array of 4 integers."
+                    )
+                }
+            ],
+            max_tokens=50,
+            temperature=0.0
+        )
+        text = completion.choices[0].message.content.strip()
+        durations = json.loads(text)
+        durations = [max(10, min(60, int(d))) for d in durations]
+        if len(durations) != 4:
+            raise ValueError(f"Expected 4 durations, got {len(durations)}")
+        return durations
+    except Exception as e:
+        print(f"[DEBUG] LLM call failed, using fallback: {e}", flush=True)
+        return get_action_fallback(obs["cars_waiting"])
 
 
 def parse_obs(data):
@@ -66,6 +112,8 @@ def run_task(task_name):
     max_steps = {"easy": 10, "medium": 30, "hard": 50}
     step_limit = max_steps[task_name]
 
+
+
     rewards: List[float] = []
     steps_taken = 0
     score = 0.0
@@ -75,7 +123,7 @@ def run_task(task_name):
     log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        response = requests.post(f"{API_BASE_URL}/reset", json={
+        response = requests.post(f"{ENV_URL}/reset", json={
             "episode_id": f"inference-{task_name}",
             "seed": 42,
             "task": task_name
@@ -84,10 +132,10 @@ def run_task(task_name):
         obs = parse_obs(response.json())
 
         for step in range(1, step_limit + 1):
-            durations = get_action(obs["cars_waiting"])
+            durations = get_action_from_llm(obs)
             action_str = str(durations)
 
-            response = requests.post(f"{API_BASE_URL}/step", json={
+            response = requests.post(f"{ENV_URL}/step", json={
                 "action": {"green_durations": durations},
                 "timeout_s": 30
             })
@@ -105,7 +153,6 @@ def run_task(task_name):
             if done:
                 break
 
-        # Score: clamp total_reward to [0, 1]
         total_reward = sum(rewards)
         score = min(max(total_reward / max(step_limit, 1), 0.0), 1.0)
         success = score > 0.0
