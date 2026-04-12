@@ -9,18 +9,6 @@ The agent reads cars_waiting and gives more green time
 to roads with more cars — a greedy heuristic strategy.
 """
 
-Here's the complete corrected inference.py:
-python"""
-inference.py — Smart Traffic Signal Controller
-Meta x Scalar Open Envs Hackathon
-
-This script demonstrates a simple rule-based agent interacting
-with the TrafficSignalEnvironment across all 3 tasks.
-
-The agent reads cars_waiting and gives more green time
-to roads with more cars — a greedy heuristic strategy.
-"""
-
 import json
 import os
 import requests
