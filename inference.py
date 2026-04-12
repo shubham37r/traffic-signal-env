@@ -114,7 +114,7 @@ def run_task(task_name):
 
     rewards: List[float] = []
     steps_taken = 0
-    score = 0.01  # ✅ default strictly > 0
+    score = 0.01
     success = False
     obs = None
 
@@ -143,7 +143,8 @@ def run_task(task_name):
             reward = result["reward"]
             done = result["done"]
 
-            rewards.append(reward)
+            rewards.append(max(float(reward), 0.01))  # ✅ floor at 0.01
+
             steps_taken = step
 
             log_step(step=step, action=action_str, reward=reward, done=done, error=None)
@@ -153,7 +154,7 @@ def run_task(task_name):
 
         total_reward = sum(rewards)
         score = min(max(total_reward / max(step_limit, 1), 0.01), 0.99)  # ✅ strictly (0, 1)
-        success = score > 0.01  # ✅ updated threshold
+        success = score > 0.01
 
     except Exception as e:
         print(f"[DEBUG] Exception in task {task_name}: {e}", flush=True)
