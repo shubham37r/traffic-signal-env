@@ -9,6 +9,18 @@ The agent reads cars_waiting and gives more green time
 to roads with more cars — a greedy heuristic strategy.
 """
 
+Here's the complete corrected inference.py:
+python"""
+inference.py — Smart Traffic Signal Controller
+Meta x Scalar Open Envs Hackathon
+
+This script demonstrates a simple rule-based agent interacting
+with the TrafficSignalEnvironment across all 3 tasks.
+
+The agent reads cars_waiting and gives more green time
+to roads with more cars — a greedy heuristic strategy.
+"""
+
 import json
 import os
 import requests
@@ -22,7 +34,7 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 
 BENCHMARK = "traffic_signal_env"
-ENV_URL = "https://shubham37r-traffic-signal-env.hf.space"  # your HF space, always fixed
+ENV_URL = "https://shubham37r-traffic-signal-env.hf.space"
 
 # OpenAI client — uses validator's injected LLM proxy URL and API key
 client = OpenAI(
@@ -112,11 +124,9 @@ def run_task(task_name):
     max_steps = {"easy": 10, "medium": 30, "hard": 50}
     step_limit = max_steps[task_name]
 
-
-
     rewards: List[float] = []
     steps_taken = 0
-    score = 0.0
+    score = 0.01  # ✅ default strictly > 0
     success = False
     obs = None
 
@@ -154,8 +164,8 @@ def run_task(task_name):
                 break
 
         total_reward = sum(rewards)
-        score = min(max(total_reward / max(step_limit, 1), 0.01), 0.99)
-        success = score > 0.0
+        score = min(max(total_reward / max(step_limit, 1), 0.01), 0.99)  # ✅ strictly (0, 1)
+        success = score > 0.01  # ✅ updated threshold
 
     except Exception as e:
         print(f"[DEBUG] Exception in task {task_name}: {e}", flush=True)
